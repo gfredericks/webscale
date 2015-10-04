@@ -51,6 +51,13 @@ Don't use it for important things, it's not a good idea.
 ;; => {:a 2, :b 2, :c 1, :d 1}
 ```
 
+## TODOs
+
+- Support rolling over to new files so no file gets too large
+  - Support saving snapshots of state when rolling over so
+    that re-reading is faster
+- Get puget integration working better for custom edn stuff
+
 ## License
 
 Copyright © 2015 Gary Fredericks
