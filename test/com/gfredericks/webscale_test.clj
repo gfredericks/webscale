@@ -1,10 +1,12 @@
 (ns com.gfredericks.webscale-test
-  (:require [clojure.test.check.clojure-test :refer [defspec]]
+  (:require [clojure.test :refer :all]
+            [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [com.gfredericks.webscale :as webscale]
             [me.raynes.fs :as fs])
-  (:import (java.util.concurrent Executors)))
+  (:import (java.awt Point)
+           (java.util.concurrent Executors)))
 
 (def gen-key (gen/elements (->> (range (int \a) (inc (int \z)))
                                 (map char)
@@ -42,28 +44,55 @@
   (prop/for-all [evs (gen/scale #(* 10000 %) (gen/list gen-event))]
     (events-go-good evs)))
 
+(defmacro with-temp-dir
+  [dir-sym & body]
+  `(let [~dir-sym (fs/temp-dir "webscale-test")]
+     (try
+       ~@body
+       (finally
+         (fs/delete-dir ~dir-sym)))))
+
 (defn test-events-in-parallel
   [events nthreads]
-  (let [dir (fs/temp-dir "webscale-test")]
-    (try
-      (let [the-thing (webscale/create incr-by-key {} dir)
-            expected-end-state (reduce incr-by-key {} events)
-            pool (Executors/newFixedThreadPool nthreads)]
-        (try
-          (let [futs
-                (.invokeAll pool (map #(partial webscale/update! the-thing %) events))]
-            (doseq [fut futs] (deref fut)))
-          (let [in-memory-end-state @the-thing
-                re-reading-end-state @(webscale/create incr-by-key {} dir)]
-            (= expected-end-state
-               in-memory-end-state
-               re-reading-end-state))
-          (finally
-            (.shutdown pool))))
-      (finally
-        (fs/delete-dir dir)))))
+  (with-temp-dir dir
+    (let [the-thing (webscale/create incr-by-key {} dir)
+          expected-end-state (reduce incr-by-key {} events)
+          pool (Executors/newFixedThreadPool nthreads)]
+      (try
+        (let [futs
+              (.invokeAll pool (map #(partial webscale/update! the-thing %) events))]
+          (doseq [fut futs] (deref fut)))
+        (let [in-memory-end-state @the-thing
+              re-reading-end-state @(webscale/create incr-by-key {} dir)]
+          (= expected-end-state
+             in-memory-end-state
+             re-reading-end-state))
+        (finally
+          (.shutdown pool))))))
 
 (defspec parallel-events-spec 10
   (prop/for-all [evs (gen/scale #(* 40 %) (gen/list gen-event))
                  nthreads gen/s-pos-int]
     (test-events-in-parallel evs nthreads)))
+
+(deftest special-types-test
+  (with-temp-dir dir
+    (let [opts {:puget-options
+                {:class-lookup
+                 {Point
+                  (fn [p]
+                    {:tag "point"
+                     :form [(.x p) (.y p)]})}}
+                :edn-options
+                {:readers
+                 {'point (fn [[x y]]
+                           (Point. x y))}}}
+          the-thing (webscale/create conj [] dir opts)
+          ev1 {:my-point (Point. 2 3)}
+          ev2 {:x 42 :another-point (Point. 0 0)}]
+      (webscale/update! the-thing ev1)
+      (is (= [ev1] @the-thing))
+      (is (= [ev1] @(webscale/create conj [] dir opts)))
+      (webscale/update! the-thing ev2)
+      (is (= [ev1 ev2] @the-thing))
+      (is (= [ev1 ev2] @(webscale/create conj [] dir opts))))))
