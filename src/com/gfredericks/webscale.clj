@@ -40,7 +40,15 @@
     (puget/pprint content puget-options)))
 
 (defn create
-  "Creates a file-backed stateful-thing."
+  "Creates a file-backed stateful-thing.
+
+  Available opts:
+
+  - :prefix        the prefix for filenames (default \"data-\")
+  - :edn-options   a map of options passed to clojure.edn/read, e.g.
+                   to provide particular data readers
+  - :puget-options a map of options passed to puget, e.g. to print
+                   particular data literal tags"
   ([reduce-fn init-state data-dir]
    (create reduce-fn init-state data-dir {}))
   ([reduce-fn init-state data-dir opts]
