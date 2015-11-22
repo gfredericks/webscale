@@ -1,5 +1,6 @@
 (ns com.gfredericks.webscale-test
-  (:require [clojure.test :refer :all]
+  (:require [bond.james :as bond]
+            [clojure.test :refer :all]
             [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
@@ -23,27 +24,34 @@
   (update state key (fnil + 0) incr))
 
 (defn events-go-good
-  [events]
+  [events opts]
   (let [dir (fs/temp-dir "webscale-test")]
     (try
-      (let [the-thing (webscale/create incr-by-key {} dir)
+      (let [make-thing #(webscale/create incr-by-key {} dir opts)
+            the-thing (make-thing)
             expected-end-state (reduce incr-by-key {} events)]
         (doseq [ev events] (webscale/update! the-thing ev))
         (let [in-memory-end-state @the-thing
-              re-reading-end-state @(webscale/create incr-by-key {} dir)]
+              re-reading-end-state @(make-thing)]
           (= expected-end-state
              in-memory-end-state
              re-reading-end-state)))
       (finally
         (fs/delete-dir dir)))))
 
+(def gen-opts
+  (gen/hash-map :max-file-size (gen/large-integer* {:min 1 :max 10000000})
+                :cache-state? gen/boolean))
+
 (defspec basic-spec 100
-  (prop/for-all [evs (gen/list gen-event)]
-    (events-go-good evs)))
+  (prop/for-all [evs (gen/list gen-event)
+                 opts gen-opts]
+    (events-go-good evs opts)))
 
 (defspec lots-of-events-spec 5
-  (prop/for-all [evs (gen/scale #(* 10000 %) (gen/list gen-event))]
-    (events-go-good evs)))
+  (prop/for-all [evs (gen/scale #(* 10000 %) (gen/list gen-event))
+                 opts gen-opts]
+    (events-go-good evs opts)))
 
 (defmacro with-temp-dir
   [dir-sym & body]
@@ -98,3 +106,18 @@
       (webscale/update! the-thing ev2)
       (is (= [ev1 ev2] @the-thing))
       (is (= [ev1 ev2] @(webscale/create conj [] dir opts))))))
+
+(deftest caching-test
+  (with-temp-dir dir
+    (let [make-thing #(webscale/create #'incr-by-key {} dir
+                                       {:max-file-size 100
+                                        :cache-state? true})
+          the-thing (make-thing)]
+      (dotimes [n 10000]
+        (let [k ('[a b c d e f] (mod n 6))]
+          (webscale/update! the-thing {:key k :incr (mod (* n 17) 19)})))
+      (is (= @the-thing '{a 15001, b 15011, c 15002, d 14993, e 14996, f 15008}))
+      (bond/with-spy [incr-by-key]
+        (is (= @(make-thing) @the-thing))
+        (is (<= (-> incr-by-key bond/calls count) 100)
+            "Caching the state means we don't have to call the update function many times.")))))

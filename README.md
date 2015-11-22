@@ -1,8 +1,9 @@
 # webscale
 
 Webscale is a stupid casual persistence thing where it stores state
-changes as pretty-printed edn in regular files so you can check it
-into git or something.
+changes (events) as pretty-printed edn in regular files so you can
+check it into git or something. It supports rolling the event files
+and caching snapshots of the state for quick startup.
 
 Don't use it for important things, it's not a good idea.
 
@@ -50,13 +51,6 @@ Don't use it for important things, it's not a good idea.
 (deref (webscale/create event-counts-fn {} "data"))
 ;; => {:a 2, :b 2, :c 1, :d 1}
 ```
-
-## TODOs
-
-- Support rolling over to new files so no file gets too large
-  - Support saving snapshots of state when rolling over so
-    that re-reading is faster
-- Get puget integration working better for custom edn stuff
 
 ## License
 
