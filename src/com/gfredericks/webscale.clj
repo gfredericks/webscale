@@ -1,7 +1,7 @@
 (ns com.gfredericks.webscale
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [com.gfredericks.puget.printer :as puget]))
+            [puget.printer :as puget]))
 
 ;;
 ;; TODO:

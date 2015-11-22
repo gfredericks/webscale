@@ -4,9 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [com.gfredericks.forks.mvxcvi/puget "0.8.2"]
-                 ;; [mvxcvi/puget "0.8.1"]
-                 ]
+                 [mvxcvi/puget "1.0.0"]]
   :deploy-repositories [["releases" :clojars]]
   :profiles {:dev {:dependencies [[me.raynes/fs "1.4.6"]
-                                  [org.clojure/test.check "0.8.2"]]}})
+                                  [org.clojure/test.check "0.9.0"]]}})

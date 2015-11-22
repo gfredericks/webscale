@@ -4,7 +4,8 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [com.gfredericks.webscale :as webscale]
-            [me.raynes.fs :as fs])
+            [me.raynes.fs :as fs]
+            [puget.printer :as puget])
   (:import (java.awt Point)
            (java.util.concurrent Executors)))
 
@@ -78,11 +79,12 @@
 (deftest special-types-test
   (with-temp-dir dir
     (let [opts {:puget-options
-                {:class-lookup
+                {:print-handlers
                  {Point
-                  (fn [p]
-                    {:tag "point"
-                     :form [(.x p) (.y p)]})}}
+                  (puget/tagged-handler
+                   'point
+                   (fn [p]
+                     [(.x p) (.y p)]))}}
                 :edn-options
                 {:readers
                  {'point (fn [[x y]]
