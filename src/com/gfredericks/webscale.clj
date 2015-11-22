@@ -81,6 +81,7 @@
                      (catch Throwable t
                        (deliver p t)
                        (throw t)))))
+    (await ag)
     (let [x @p]
       (if (instance? Throwable x)
         (throw x)
