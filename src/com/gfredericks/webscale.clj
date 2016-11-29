@@ -51,7 +51,7 @@
   (assoc puget/*options*
          :strict true
          :print-color false
-         :print-fallback true))
+         :print-fallback :print))
 
 (def default-opts
   {:edn-options {}

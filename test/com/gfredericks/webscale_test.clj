@@ -84,28 +84,53 @@
                  nthreads gen/s-pos-int]
     (test-events-in-parallel evs nthreads)))
 
+(deftype Box [x]
+  Object
+  (equals [_ y]
+    (and (instance? Box y) (= x (.x y)))))
+
+(defmethod print-method Box
+  [box pw]
+  (.write pw "#user/box ")
+  (print-method (.x box) pw))
+
 (deftest special-types-test
-  (with-temp-dir dir
-    (let [opts {:puget-options
-                {:print-handlers
-                 {Point
-                  (puget/tagged-handler
-                   'point
-                   (fn [p]
-                     [(.x p) (.y p)]))}}
-                :edn-options
-                {:readers
-                 {'point (fn [[x y]]
-                           (Point. x y))}}}
-          the-thing (webscale/create conj [] dir opts)
-          ev1 {:my-point (Point. 2 3)}
-          ev2 {:x 42 :another-point (Point. 0 0)}]
-      (webscale/update! the-thing ev1)
-      (is (= [ev1] @the-thing))
-      (is (= [ev1] @(webscale/create conj [] dir opts)))
-      (webscale/update! the-thing ev2)
-      (is (= [ev1 ev2] @the-thing))
-      (is (= [ev1 ev2] @(webscale/create conj [] dir opts))))))
+  (testing "with explicit print-handlers"
+    (with-temp-dir dir
+      (let [opts {:puget-options
+                  {:print-handlers
+                   {Point
+                    (puget/tagged-handler
+                     'point
+                     (fn [p]
+                       [(.x p) (.y p)]))}}
+                  :edn-options
+                  {:readers
+                   {'point (fn [[x y]]
+                             (Point. x y))}}}
+            the-thing (webscale/create conj [] dir opts)
+            ev1 {:my-point (Point. 2 3)}
+            ev2 {:x 42 :another-point (Point. 0 0)}]
+        (webscale/update! the-thing ev1)
+        (is (= [ev1] @the-thing))
+        (is (= [ev1] @(webscale/create conj [] dir opts)))
+        (webscale/update! the-thing ev2)
+        (is (= [ev1 ev2] @the-thing))
+        (is (= [ev1 ev2] @(webscale/create conj [] dir opts))))))
+  (testing "with print-fallback"
+    (with-temp-dir dir
+      (let [opts {:edn-options
+                  {:readers
+                   {'user/box (fn [x] (Box. x))}}}
+            the-thing (webscale/create conj [] dir opts)
+            ev1 {:my-box (Box. "24")}
+            ev2 {:x 42 :another-box (Box. [19])}]
+        (webscale/update! the-thing ev1)
+        (is (= [ev1] @the-thing))
+        (is (= [ev1] @(webscale/create conj [] dir opts)))
+        (webscale/update! the-thing ev2)
+        (is (= [ev1 ev2] @the-thing))
+        (is (= [ev1 ev2] @(webscale/create conj [] dir opts)))))))
 
 (deftest caching-test
   (with-temp-dir dir
