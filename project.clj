@@ -1,4 +1,4 @@
-(defproject com.gfredericks/webscale "0.1.3"
+(defproject com.gfredericks/webscale "0.1.4-SNAPSHOT"
   :description "Casual file-based persistence in Clojure."
   :url "https://github.com/gfredericks/webscale"
   :license {:name "Eclipse Public License"
