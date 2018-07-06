@@ -7,5 +7,5 @@
                  [mvxcvi/puget "1.0.0"]]
   :deploy-repositories [["releases" :clojars]]
   :profiles {:dev {:dependencies [[me.raynes/fs "1.4.6"]
-                                  [org.clojure/test.check "0.9.0"]
+                                  [org.clojure/test.check "0.10.0-alpha3"]
                                   [bond "0.2.5"]]}})
