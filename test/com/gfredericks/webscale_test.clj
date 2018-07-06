@@ -145,4 +145,19 @@
       (bond/with-spy [incr-by-key]
         (is (= @(make-thing) @the-thing))
         (is (<= (-> incr-by-key bond/calls count) 100)
-            "Caching the state means we don't have to call the update function many times.")))))
+            "Caching the state means we don't have to call the update function many times."))
+      (testing "cache files can be regenerated on create"
+        (let [slurp-cache-state
+              (fn []
+                (->> (fs/list-dir dir)
+                     (filter #(re-matches #".*\.cache\.edn" (str %)))
+                     (map (fn [file]
+                            [file (slurp file)]))
+                     (into {})))
+
+              current-cache-state (slurp-cache-state)]
+          (is (< 1000 (count current-cache-state)))
+          (run! fs/delete (keys current-cache-state))
+          (is (= {} (slurp-cache-state)))
+          (make-thing)
+          (is (= current-cache-state (slurp-cache-state))))))))

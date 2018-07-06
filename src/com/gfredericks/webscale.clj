@@ -15,10 +15,18 @@
               pbr (java.io.PushbackReader. r)]
     (edn/read opts pbr)))
 
+(defn ^:private pretty-spit
+  "Appends the data to the file using the puget pretty-printer."
+  [file content puget-options]
+  (binding [*out* (io/writer file :append true)]
+    (puget/pprint content puget-options)))
+
 (let [EOF (Object.)]
   (defn ^:private read-state
-    "Returns [current-state current-file-num]."
-    [reduce-fn init-state file-fn cache-file-fn edn-opts]
+    "Returns [current-state current-file-num]. Writes any missing cache
+    files, if appropriate."
+    [reduce-fn init-state file-fn cache-file-fn
+     {:keys [edn-options cache-state? puget-options]}]
     (let [max-file (->> (range)
                         (take-while #(.exists ^File (file-fn %)))
                         (last))
@@ -29,19 +37,25 @@
       (if-not max-file
         [init-state 0]
         (let [init-state (if max-cache-file
-                           (read-edn-from-file edn-opts (cache-file-fn max-cache-file))
+                           (read-edn-from-file edn-options (cache-file-fn max-cache-file))
                            init-state)
               files-to-read (range (or max-cache-file 0) (inc max-file))
-              edn-opts (assoc edn-opts :eof EOF)
+              edn-options (assoc edn-options :eof EOF)
 
               current-state
               (reduce (fn [state file-num]
                         (with-open [r (io/reader (file-fn file-num))
                                     pbr (java.io.PushbackReader. r)]
                           (loop [ret state]
-                            (let [x (edn/read edn-opts pbr)]
+                            (let [x (edn/read edn-options pbr)]
                               (if (= EOF x)
-                                ret
+                                (do
+                                  (when (and (< file-num max-file)
+                                             cache-state?)
+                                    (let [cache-file (cache-file-fn (inc file-num))]
+                                      (when-not (.exists ^File cache-file)
+                                        (pretty-spit cache-file ret puget-options))))
+                                  ret)
                                 (recur (reduce-fn ret x)))))))
                       init-state
                       files-to-read)]
@@ -59,12 +73,6 @@
    :prefix "data-"
    :max-file-size 200000
    :cache-state? true})
-
-(defn ^:private pretty-spit
-  "Appends the data to the file using the puget pretty-printer."
-  [file content puget-options]
-  (binding [*out* (io/writer file :append true)]
-    (puget/pprint content puget-options)))
 
 (defn create
   "Creates a file-backed stateful-thing.
@@ -94,7 +102,7 @@
          cache-file-fn #(file-fn (str % ".cache"))]
      (io/make-parents (file-fn 0))
      (let [[current-state current-file-num]
-           (read-state reduce-fn init-state file-fn cache-file-fn (:edn-options opts))]
+           (read-state reduce-fn init-state file-fn cache-file-fn opts)]
        (doto (agent current-state)
          (alter-meta! assoc :webscale {:file-fn file-fn
                                        :cache-file-fn cache-file-fn
