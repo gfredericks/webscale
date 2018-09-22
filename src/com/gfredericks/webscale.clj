@@ -114,6 +114,17 @@
 ;; concurrently with file-writing (in a pipeline way), and the writes
 ;; could even be batched.
 (defn update!
+  "Given a webscale object created by the created function, and an
+  event, synchronously writes the event to the appropriate files,
+  updates the in-memory state, and returns the new state.
+
+  If the reduce-fn throws an exception, this function will throw as
+  well, and the webscale object will remain unaffected.
+
+  Exceptions during file IO are currently not handled well, and will
+  result in the webscale object being unusable -- at that point you
+  will want to examine the files manually to see if they need
+  repairing, and then recreate the webscale object."
   [ag ev]
   (let [{{:keys [reduce-fn file-fn cache-file-fn current-file-num]
           {:keys [edn-options puget-options max-file-size cache-state?]}
