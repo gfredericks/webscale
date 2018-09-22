@@ -10,7 +10,7 @@ Don't use it for important things, it's not a good idea.
 ## Obtention
 
 ``` clojure
-[com.gfredericks/webscale "0.1.4"]
+[com.gfredericks/webscale "0.1.5"]
 ```
 
 ## Usage
