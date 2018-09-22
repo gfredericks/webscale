@@ -161,3 +161,14 @@
           (is (= {} (slurp-cache-state)))
           (make-thing)
           (is (= current-cache-state (slurp-cache-state))))))))
+
+(deftest error-in-reduce-fn-test
+  (with-temp-dir dir
+    (let [thing (webscale/create + 0 dir)]
+      (is (= 5 (webscale/update! thing 5)))
+      (is (= 5 @thing))
+      (is (thrown-with-msg? Exception #"cannot be cast to"
+                            (webscale/update! thing :not-a-number)))
+      (is (= 5 @thing))
+      (is (= 12 (webscale/update! thing 7)))
+      (is (= 12 @thing)))))

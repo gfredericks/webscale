@@ -133,34 +133,43 @@
         (meta ag)
         p (promise)]
     (send-off ag (fn [state]
-                   (try
-                     ;; presumably there's a race condition here if
-                     ;; the file writing gets interrupted. pretty easy
-                     ;; to fix by hand though, and impossible not to
-                     ;; notice since the agent will have an error, and
-                     ;; restarting will have an error trying to read
-                     ;; the file.
-                     (let [new-state (reduce-fn state ev)
-                           ^File
-                           current-file (file-fn current-file-num)]
-                       (if (and max-file-size
-                                (.exists current-file)
-                                (<= max-file-size (.length current-file)))
-                         (let [next-file-num (inc current-file-num)]
-                           (pretty-spit (file-fn next-file-num)
-                                        ev puget-options)
-                           (when cache-state?
-                             (pretty-spit (cache-file-fn next-file-num)
-                                          state puget-options))
-                           (alter-meta! ag assoc-in [:webscale :current-file-num]
-                                        next-file-num))
-                         (pretty-spit (file-fn current-file-num)
-                                      ev puget-options))
-                       (deliver p [new-state])
-                       new-state)
-                     (catch Throwable t
-                       (deliver p t)
-                       (throw t)))))
+                   (let [[new-state thrown]
+                         (try
+                           [(reduce-fn state ev)]
+                           (catch Throwable t
+                             [nil t]))]
+                     (if thrown
+                       (do
+                         (deliver p thrown)
+                         state)
+                       (try
+                         ;; presumably there's a race condition here if
+                         ;; the file writing gets interrupted. pretty easy
+                         ;; to fix by hand though, and impossible not to
+                         ;; notice since the agent will have an error, and
+                         ;; restarting will have an error trying to read
+                         ;; the file.
+                         (let [new-state (reduce-fn state ev)
+                               ^File
+                               current-file (file-fn current-file-num)]
+                           (if (and max-file-size
+                                    (.exists current-file)
+                                    (<= max-file-size (.length current-file)))
+                             (let [next-file-num (inc current-file-num)]
+                               (pretty-spit (file-fn next-file-num)
+                                            ev puget-options)
+                               (when cache-state?
+                                 (pretty-spit (cache-file-fn next-file-num)
+                                              state puget-options))
+                               (alter-meta! ag assoc-in [:webscale :current-file-num]
+                                            next-file-num))
+                             (pretty-spit (file-fn current-file-num)
+                                          ev puget-options))
+                           (deliver p [new-state])
+                           new-state)
+                         (catch Throwable t
+                           (deliver p t)
+                           (throw t)))))))
     (await ag)
     (let [x @p]
       (if (instance? Throwable x)
